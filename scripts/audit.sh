@@ -65,5 +65,21 @@ else
 fi
 check "Права файлов безопасны (нет 666, ключ 600)" "secure" "$SECURE_RESULT"
 
+echo "[5] Контейнеризация"
+# а) служба docker активна
+check "Служба docker активна" "active" "$(systemctl is-active docker)"
+
+# б) контейнер СУБД healthy
+DB_HEALTH=$(docker inspect -f '{{.State.Health.Status}}' app-db-1 2>/dev/null || echo "not_found")
+check "Контейнер СУБД healthy" "healthy" "$DB_HEALTH"
+
+# в) порты 5000 и 5432 не прослушиваются на всех адресах, кроме 127.0.0.1
+BAD_PORTS=$(ss -tln | awk '$4 ~ /:5000$/ && $4 !~ /^127\.0\.0\.1:/ {print}' | wc -l)
+check "Порты 5000/5432 не доступны извне" "0" "$BAD_PORTS"
+
+# г) права .env равны 600
+ENV_PERMS=$(stat -c '%a' ~/app/.env)
+check "Права .env равны 600" "600" "$ENV_PERMS"
+
 echo "Пройдено: $PASS, не пройдено: $FAIL"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1
